@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>工单治理工作流 Demo - 工单治理看板 v2</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<style>
+:root{--main:#1e4a78;--line:#e2e8f0;--bg:#f1f5f9;--ok:#16a34a;--warn:#ea580c;--bad:#dc2626}
+*{box-sizing:border-box}body{margin:0;font-family:"PingFang SC","Microsoft YaHei",-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:#1e293b;-webkit-font-smoothing:antialiased}
+a{color:var(--main)}
+.header{background:linear-gradient(135deg,#0f2a4a 0%,#1e4a78 55%,#2d6fa3 100%);color:#fff;padding:22px 28px 18px;position:relative;overflow:hidden}
+.header::after{content:"工单治理 · 仿真演示";position:absolute;right:18px;top:14px;border:1px solid rgba(255,255,255,.7);padding:4px 10px;border-radius:999px;font-size:11px;letter-spacing:.5px;opacity:.9}
+.header h1{margin:0;font-size:20px;letter-spacing:.5px;font-weight:800}
+.header .sub{margin:6px 0 0;opacity:.88;font-size:12px;line-height:1.6}
+.header .meta{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+.badge{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);padding:4px 8px;border-radius:999px;font-size:11px}
+.toolbar{margin:14px 28px 0;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.toolbar label{font-size:11px;color:#64748b}
+.toolbar select{border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:12px;background:#fff;min-width:130px}
+.toolbar .btn{margin-left:auto;display:flex;gap:8px}
+.btn-primary{background:var(--main);color:#fff;border:0;padding:8px 14px;border-radius:8px;font-size:12px;cursor:pointer}
+.btn-ghost{background:#fff;border:1px solid var(--line);padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer}
+.watermark{position:fixed;right:18px;bottom:18px;background:rgba(15,42,74,.08);border:1px dashed rgba(15,42,74,.15);padding:8px 12px;border-radius:10px;font-size:11px;color:#334155;backdrop-filter:blur(2px);z-index:9}
+/* 跑道 */
+.track{margin:16px 28px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.track-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.track-head h3{margin:0;font-size:13px;color:var(--main)}
+.track-head span{font-size:11px;color:#64748b}
+.rail{position:relative;height:4px;background:#e2e8f0;border-radius:999px;margin:0 6px}
+.rail i{position:absolute;left:0;top:0;height:100%;width:42%;background:linear-gradient(90deg,var(--main),#38bdf8);border-radius:999px}
+.steps5{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:12px}
+.step5{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;position:relative}
+.step5 .dot{width:28px;height:28px;border-radius:50%;background:var(--main);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+.step5.active{border-color:#38bdf8;box-shadow:0 4px 14px rgba(56,189,248,.18);background:#fff}
+.step5 h4{margin:8px 0 4px;font-size:12px;color:var(--main)}
+.step5 p{margin:0;font-size:11px;line-height:1.6;color:#475569}
+/* KPI */
+.kpis{display:grid;grid-template-columns:1.35fr 1fr 1fr 1fr;gap:14px;margin:14px 28px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px}
+.kpi.main{padding:12px 14px;display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:center;border-color:#fecaca}
+.kpi .label{font-size:11px;color:#64748b;letter-spacing:.3px}
+.kpi .val{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:26px;font-weight:800;color:var(--main);margin:4px 0}
+.kpi .sub{font-size:11px;color:#64748b;line-height:1.4}
+.kpi.main .chart{width:110px;height:110px}
+.kpi.muted{opacity:.95}
+.bar{height:6px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,#1e4a78,#38bdf8)}
+.alert{margin-top:8px;font-size:11px;padding:6px 8px;border-radius:8px}
+.alert-warn{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412}
+.alert-ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534}
+/* 三维度 */
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin:14px 28px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.card h4{margin:0;padding:11px 14px;background:#f8fafc;border-bottom:1px solid var(--line);font-size:12px;color:var(--main);display:flex;align-items:center;justify-content:space-between}
+.card h4 small{font-weight:400;color:#64748b;font-size:11px}
+.chart-box{height:170px;padding:8px 6px 0}
+.table{width:100%;border-collapse:collapse;font-size:11px}
+.table th{background:var(--main);color:#fff;padding:7px 6px;text-align:center;font-weight:600}
+.table td{padding:6px 6px;text-align:center;border-bottom:1px solid #f1f5f9}
+.table tr:nth-child(even){background:#f8fafc}
+.insight{padding:8px 12px;font-size:11px;color:#475569;background:#f8fafc;border-top:1px solid var(--line);line-height:1.5}
+/* 改进矩阵 */
+.matrix{margin:0 28px;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.matrix h4{margin:0;padding:11px 14px;background:#f8fafc;border-bottom:1px solid var(--line);font-size:12px;color:var(--main)}
+.kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:14px}
+.kcard{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff;transition:transform .15s, box-shadow .15s}
+.kcard:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(15,42,74,.08)}
+.kcard .top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.tag{font-size:10px;font-weight:700;padding:3px 7px;border-radius:999px;border:1px solid}
+.tag-p0{background:#fee2e2;color:#b91c1c;border-color:#fecaca}
+.tag-p1{background:#fef3c7;color:#92400e;border-color:#fde68a}
+.tag-p2{background:#dcfce7;color:#166534;border-color:#bbf7d0}
+.status{margin-left:auto;font-size:10px;padding:3px 7px;border-radius:999px;background:#f1f5f9;color:#475569;border:1px solid var(--line)}
+.kcard h5{margin:0 0 6px;font-size:12px;color:#0f172a}
+.kcard p{margin:0;font-size:11px;color:#475569;line-height:1.5}
+.kcard .meta{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:#64748b}
+.kcard .meta span{background:#f8fafc;border:1px solid var(--line);padding:3px 6px;border-radius:6px}
+.progress{height:6px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin-top:10px}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--main),#22c55e)}
+.before-after{margin:14px 28px;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.before-after h4{margin:0;padding:11px 14px;background:#f8fafc;border-bottom:1px solid var(--line);font-size:12px;color:var(--main)}
+.ba-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0}
+.ba{padding:14px;border-right:1px solid var(--line);text-align:center}
+.ba:last-child{border-right:0}
+.ba .big{font-family:"JetBrains Mono",monospace;font-size:20px;font-weight:800}
+.ba .label{font-size:11px;color:#64748b;margin-top:4px}
+.ba .delta{font-size:11px;margin-top:6px;padding:3px 7px;border-radius:999px;display:inline-block}
+.delta-down{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}
+.delta-up{background:#fee2e2;color:#b91c1c;border:1px solid #fecaca}
+.extras{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 28px}
+.extra{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;border-left:4px solid var(--main)}
+.extra h5{margin:0 0 6px;font-size:12px}
+.extra p{margin:0;font-size:11px;color:#475569;line-height:1.5}
+.footer{padding:14px 28px;color:#94a3b8;font-size:11px;text-align:center;line-height:1.6}
+@media(max-width:900px){
+  .kpis{grid-template-columns:1fr 1fr}
+  .kpi.main{grid-template-columns:100px 1fr}
+  .grid3{grid-template-columns:1fr}
+  .kanban{grid-template-columns:1fr 1fr}
+  .extras{grid-template-columns:1fr}
+  .steps5{grid-template-columns:1fr}
+  .ba-grid{grid-template-columns:1fr}
+  .toolbar .btn{margin-left:0}
+}
+@media print{
+  .toolbar,.watermark,.header::after{display:none !important}
+  body{background:#fff}
+  .card,.kpi,.track,.matrix,.before-after,.extra{break-inside:avoid;box-shadow:none !important}
+  @page{size:A3 landscape;margin:10mm}
+}
+</style></head><body>
+<div class="header">
+  <h1>工单治理工作流 · 工单治理看板 v2</h1>
+  <div class="sub">字段标准化(11字段) → 三维度分析(时长/类型/办法) → 总体概况(总量/环比/人均/SLA) → 优先级矩阵(P0/P1/P2) → PDCA闭环 · 基于 2026-08 30单仿真数据 · 方法可直接复用到真实工单池</div>
+  <div class="meta">
+    <span class="badge">11字段必填 · 封闭分类</span>
+    <span class="badge">SLA 24h · 四档时长</span>
+    <span class="badge">帕累托 TOP3 60%</span>
+    <span class="badge">P0/P1/P2 矩阵</span>
+    <span class="badge">Excel 公式化 + HTML 看板</span>
+  </div>
+</div>
+
+<div class="toolbar">
+  <label>月份</label>
+  <select id="fMonth"><option>2026-08 (Demo)</option><option>2026-07</option></select>
+  <label>产品</label>
+  <select id="fProduct"><option value="all">全部产品</option><option>云桌面VDI</option><option>云主机ECS</option><option>网络VPN</option><option>云存储OSS</option><option>数据库RDS</option></select>
+  <label>处理人</label>
+  <select id="fHandler"><option value="all">全部</option><option>陈工</option><option>刘工</option><option>周工</option><option>吴工</option></select>
+  <div class="btn">
+    <button class="btn-ghost" onclick="window.print()">导出一页纸 PDF</button>
+    <button class="btn-primary" onclick="document.getElementById('improve').scrollIntoView({behavior:'smooth'})">跳到改进建议</button>
+  </div>
+</div>
+
+<div class="track">
+  <div class="track-head"><h3>5步闭环跑道</h3><span>当前高亮至 Step 2-3（分析→排序），面试时沿轨道讲解即可</span></div>
+  <div class="rail"><i></i></div>
+  <div class="steps5">
+    <div class="step5"><div class="dot">1</div><h4>收集 · 标准化</h4><p>11字段必填，分类 L1-L3 封闭选项，时间到分钟，描述分“客户原话+工程师标准化”。</p></div>
+    <div class="step5 active"><div class="dot">2</div><h4>分析 · 三维度</h4><p>时长四档看超时；类型×产品找帕累托；办法看平均时长+一次解决率。</p></div>
+    <div class="step5 active"><div class="dot">3</div><h4>排序 · 矩阵</h4><p>高频×高影响→P0，高难度→专项，低影响→批量优化/观察。</p></div>
+    <div class="step5"><div class="dot">4</div><h4>汇总 · 一页纸</h4><p>总量/环比/人均/SLA + TOP根因 + 每条建议带负责人/时间/验收指标。</p></div>
+    <div class="step5"><div class="dot">5</div><h4>改进 · PDCA</h4><p>建单→三线执行(产品/运维/服务)→下月复盘→沉淀知识库/脚本/需求。</p></div>
+  </div>
+</div>
+
+<div class="kpis">
+  <div class="kpi main">
+    <div id="slaRing" class="chart"></div>
+    <div>
+      <div class="label">SLA 达成率 · 核心预警</div>
+      <div class="val">66.7%</div>
+      <div class="sub">超时 10 单 / 30 单 · 阈值 80% · <span style="color:#dc2626">未达标</span></div>
+      <div class="alert alert-warn">⚠️ 超时全部由 Bug/转研发贡献(平均36-42h)，需立即建联动SOP</div>
+    </div>
+  </div>
+  <div class="kpi"><div class="label">本月工单总量</div><div class="val">30</div><div class="sub">上月 26 · <span style="color:#dc2626">+15.4% ↑</span> 高频抬升</div><div class="bar"><i style="width:75%"></i></div></div>
+  <div class="kpi"><div class="label">人均单量</div><div class="val">7.5</div><div class="sub">4人承接 · 周工 9单最高</div><div class="bar"><i style="width:62%"></i></div></div>
+  <div class="kpi muted"><div class="label">环比增长率</div><div class="val">+15.4%</div><div class="sub">需关注 · TOP3 占60%</div><div class="alert alert-ok" style="margin-top:8px">✓ 已定位性能卡顿+登录认证主因</div></div>
+</div>
+
+<div class="grid3">
+  <div class="card">
+    <h4>维度1：处理时长 <small>→ SLA 瓶颈</small></h4>
+    <div id="chartDuration" class="chart-box"></div>
+    <table class="table"><tr><th>区间</th><th>单量</th><th>占比</th><th>平均</th></tr>
+      <tr><td>≤4h 快速</td><td>6</td><td>20%</td><td>2.8h</td></tr>
+      <tr><td>4-12h 标准</td><td>9</td><td>30%</td><td>7.5h</td></tr>
+      <tr><td>12-24h 临界</td><td>5</td><td>16.7%</td><td>18.2h</td></tr>
+      <tr style="background:#fff7ed"><td><b>24-48h 超时</b></td><td><b>10</b></td><td><b>33.3%</b></td><td><b>34.6h</b></td></tr>
+    </table>
+    <div class="insight">结论：<b style="color:#c2410c">超时= Bug/转研发</b>，时长是快速段的12倍 → P0 建 Bug 联动SOP+workaround 库。</div>
+  </div>
+  <div class="card">
+    <h4>维度2：问题类型 <small>→ 帕累托 TOP3=60%</small></h4>
+    <div id="chartType" class="chart-box"></div>
+    <table class="table"><tr><th>分类</th><th>单量</th><th>产品集中</th></tr>
+      <tr style="background:#fefce8"><td>性能卡顿 23.3%</td><td>7</td><td>ECS/VDI</td></tr>
+      <tr style="background:#fefce8"><td>登录认证 20%</td><td>6</td><td>VDI</td></tr>
+      <tr><td>网络中断 16.7%</td><td>5</td><td>VPN</td></tr>
+      <tr><td>配置错误 16.7%</td><td>5</td><td>全产品</td></tr>
+      <tr><td>计费账单 13.3%</td><td>4</td><td>ECS/OSS</td></tr>
+      <tr><td>数据丢失 10%</td><td>3</td><td>OSS/RDS</td></tr>
+    </table>
+    <div class="insight">结论：<b>啃掉 TOP2(性能+登录)就降43%</b>，且产品集中度高 → 定点爆破。</div>
+  </div>
+  <div class="card">
+    <h4>维度3：处理办法 <small>→ 有效性</small></h4>
+    <div id="chartMethod" class="chart-box"></div>
+    <table class="table"><tr><th>办法</th><th>单量</th><th>平均时长</th><th>一次解决率</th></tr>
+      <tr><td>重置密码</td><td>5</td><td>2.5h</td><td style="color:#16a34a"><b>100%</b></td></tr>
+      <tr><td>重启服务</td><td>6</td><td>4.2h</td><td style="color:#16a34a">92%</td></tr>
+      <tr><td>扩容资源</td><td>5</td><td>8.0h</td><td>80%</td></tr>
+      <tr><td>workaround</td><td>5</td><td>12.4h</td><td style="color:#ca8a04">60%</td></tr>
+      <tr style="background:#fff7ed"><td>修复Bug</td><td>5</td><td>36.2h</td><td style="color:#dc2626">40%</td></tr>
+      <tr style="background:#fff7ed"><td>转研发</td><td>4</td><td>42h</td><td style="color:#dc2626">25%</td></tr>
+    </table>
+    <div class="insight">结论：<b>重启/重置可一线自助化</b>，Bug类低解决率需沉淀SOP。</div>
+  </div>
+</div>
+
+<div id="improve" class="matrix">
+  <h4>汇总排序 → 改进建议（高频×高影响×高难度 矩阵）· 看板卡片</h4>
+  <div class="kanban">
+    <div class="kcard"><div class="top"><span class="tag tag-p0">P0 根治</span><span class="status">进行中</span></div><h5>性能卡顿 @ ECS/VDI · 7单</h5><p>高频TOP1 + 临界18.2h。集中在 ECS/VDI 资源调度。</p><div class="meta"><span>负责人：产品/研发</span><span>完成：10.15</span></div><div class="meta"><span>验收：该类工单下月-40%</span></div><div class="progress"><i style="width:45%"></i></div></div>
+    <div class="kcard"><div class="top"><span class="tag tag-p0">P0 根治</span><span class="status">待启动</span></div><h5>Bug/转研发 · 9单占30%</h5><p>高难度+超时100%。Bug单填写率仅30%，链路断。</p><div class="meta"><span>负责人：运维/研发</span><span>完成：09.30</span></div><div class="meta"><span>验收：超时率33%→15%</span></div><div class="progress"><i style="width:15%"></i></div></div>
+    <div class="kcard"><div class="top"><span class="tag tag-p1">P1 专项</span><span class="status">待启动</span></div><h5>登录认证 · 6单</h5><p>高频TOP2，全员影响。AD同步延迟为主因。</p><div class="meta"><span>负责人：运维/安全</span><span>完成：10.10</span></div><div class="meta"><span>验收：登录类-50%</span></div><div class="progress"><i style="width:20%"></i></div></div>
+    <div class="kcard"><div class="top"><span class="tag tag-p2">P2 优化</span><span class="status">已验证</span></div><h5>配置错误 · 5单</h5><p>低难但重复，模板/权限校验缺失。</p><div class="meta"><span>负责人：运维组长</span><span>完成：09.25</span></div><div class="meta"><span>验收：一次解决率95%</span></div><div class="progress"><i style="width:90%"></i></div></div>
+  </div>
+</div>
+
+<div class="before-after">
+  <h4>预期治理效果（基于 Demo 推演）</h4>
+  <div class="ba-grid">
+    <div class="ba"><div class="big">33% → <span style="color:var(--ok)">15%</span></div><div class="label">超时率</div><div class="delta delta-down">↓ -18pp · 预期</div></div>
+    <div class="ba"><div class="big">7.5 → <span style="color:var(--ok)">5.2</span> 单/人</div><div class="label">人均单量（自助拦截后）</div><div class="delta delta-down">↓ -30% · 预期</div></div>
+    <div class="ba"><div class="big">23% → <span style="color:var(--ok)">13%</span></div><div class="label">性能卡顿占比</div><div class="delta delta-down">↓ -10pp · 预期</div></div>
+  </div>
+</div>
+
+<div class="extras">
+  <div class="extra" style="border-left-color:var(--main)"><h5>💡 额外建议 1：分级+预处理拦截（降频）</h5><p>36% 的“重置/重启”一次解决率>90%，做成<strong>自助机器人/一键诊断</strong>前置拦截，预计直接降频30%+。</p></div>
+  <div class="extra" style="border-left-color:var(--ok)"><h5>💡 额外建议 2：工单↔Bug双向关联（降难度）</h5><p>强制<strong>工单↔Bug双向关联+超时自动升级</strong>，workaround 沉淀知识库，高难度时长 36h→15h。</p></div>
+  <div class="extra" style="border-left-color:#ca8a04"><h5>💡 额外建议 3：产品×分类热力图（早预警）</h5><p>每月跑<strong>产品×分类交叉热力图</strong>，VDI+登录、ECS+性能 连续飘红则提前巡检，从救火变防火。</p></div>
+  <div class="extra" style="border-left-color:#7c3aed"><h5>💡 额外建议 4：客户体验闭环（提满意度）</h5><p>结单后24h自动回访+超时根因说明模板+计费准实时化，投诉类可降50%。</p></div>
+</div>
+
+<div class="footer">
+  仿真数据演示 · 方法可直接复用到真实工单池 · Excel：/output/工单治理Demo/工单治理工作流Demo.xlsx · 打印请用「导出一页纸 PDF」<br>逐字稿提示：先讲5步跑道→KPI预警→3图→4张改进卡→前后对比→4个额外建议，5分钟闭环
+</div>
+<div class="watermark">可投屏 · A3打印友好</div>
+
+<script>
+// 环形
+const ring = echarts.init(document.getElementById('slaRing'));
+ring.setOption({
+  series:[{type:'pie',radius:['72%','90%'],avoidLabelOverlap:false, itemStyle:{borderRadius:6}, label:{show:false}, data:[
+    {value:66.7,name:'达成',itemStyle:{color:'#16a34a'}},{value:33.3,name:'超时',itemStyle:{color:'#fee2e2'}}]}],
+  graphic:{type:'text',left:'center',top:'center',style:{text:'66.7%',fontSize:16,fontWeight:800,fill:'#1e4a78'}}
+});
+// 时长条形
+const d = echarts.init(document.getElementById('chartDuration'));
+d.setOption({grid:{left:36,right:12,top:10,bottom:20},xAxis:{type:'value',max:40},yAxis:{type:'category',data:['≤4h','4-12h','12-24h','24-48h'],axisLabel:{fontSize:11}},series:[{type:'bar',data:[6,9,5,10],itemStyle:{color:params=>params.dataIndex===3?'#ea580c':'#1e4a78',borderRadius:[0,6,6,0]},label:{show:true,position:'right',fontSize:10}}]});
+// 类型环形
+const t = echarts.init(document.getElementById('chartType'));
+t.setOption({series:[{type:'pie',radius:['45%','75%'],itemStyle:{borderRadius:6,borderColor:'#fff',borderWidth:2},label:{fontSize:10},data:[
+  {value:7,name:'性能卡顿',itemStyle:{color:'#1e4a78'}},{value:6,name:'登录认证',itemStyle:{color:'#2d6fa3'}},{value:5,name:'网络中断',itemStyle:{color:'#38bdf8'}},{value:5,name:'配置错误',itemStyle:{color:'#94a3b8'}},{value:4,name:'计费账单',itemStyle:{color:'#cbd5e1'}},{value:3,name:'数据丢失',itemStyle:{color:'#f1f5f9'}}]}]});
+// 办法条形（平均时长）
+const m = echarts.init(document.getElementById('chartMethod'));
+m.setOption({grid:{left:70,right:12,top:10,bottom:20},xAxis:{type:'value'},yAxis:{type:'category',data:['重置密码','重启服务','扩容资源','workaround','修复Bug','转研发'],axisLabel:{fontSize:10}},series:[{type:'bar',data:[2.5,4.2,8,12.4,36.2,42],itemStyle:{color:params=>params.dataIndex>=4?'#dc2626':'#1e4a78',borderRadius:[0,6,6,0]},label:{show:true,position:'right',formatter:'{c}h',fontSize:10}}]});
+window.addEventListener('resize',()=>{ring.resize();d.resize();t.resize();m.resize()});
+// 筛选演示（占位过滤）
+document.getElementById('fProduct').addEventListener('change',e=>{
+  const v=e.target.value;
+  if(v==='all') return;
+  alert('演示：已筛选 “'+v+'” · 真实接入后此处会联动重算 3图+表格（Demo 保持静态展示）');
+});
+document.getElementById('fHandler').addEventListener('change',e=>{
+  if(e.target.value==='all') return;
+  alert('演示：已筛选处理人 “'+e.target.value+'” · 真实接入后联动过滤');
+});
+</script>
+</body></html>
