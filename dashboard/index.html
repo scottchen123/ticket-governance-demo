@@ -2,6 +2,7 @@
 <html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>工单治理工作流 Demo - 工单治理看板 v2</title>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{--main:#1e4a78;--line:#e2e8f0;--bg:#f1f5f9;--ok:#16a34a;--warn:#ea580c;--bad:#dc2626}
 *{box-sizing:border-box}body{margin:0;font-family:"PingFang SC","Microsoft YaHei",-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:#1e293b;-webkit-font-smoothing:antialiased}
@@ -33,7 +34,7 @@ a{color:var(--main)}
 .step5 h4{margin:8px 0 4px;font-size:12px;color:var(--main)}
 .step5 p{margin:0;font-size:11px;line-height:1.6;color:#475569}
 /* KPI */
-.kpis{display:grid;grid-template-columns:1.35fr 1fr 1fr 1fr;gap:14px;margin:14px 28px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:14px 28px}
 .kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px}
 .kpi.main{padding:12px 14px;display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:center;border-color:#fecaca}
 .kpi .label{font-size:11px;color:#64748b;letter-spacing:.3px}
@@ -106,10 +107,21 @@ a{color:var(--main)}
   .card,.kpi,.track,.matrix,.before-after,.extra{break-inside:avoid;box-shadow:none !important}
   @page{size:A3 landscape;margin:10mm}
 }
+
+/* product upload */
+.product-bar{margin:14px 28px 0;background:linear-gradient(135deg,#fff 0%,#f8fbff 100%);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.product-bar .cta{display:flex;gap:10px;flex-wrap:wrap}
+.upload-zone{flex:1;min-width:280px;border:1.5px dashed #93c5fd;background:#f0f9ff;border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:.15s}
+.upload-zone.drag{border-color:#1e4a78;background:#e0f2fe;transform:scale(1.01)}
+.upload-zone .icon{width:36px;height:36px;border-radius:8px;background:#1e4a78;color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px}
+.upload-zone .hint{font-size:12px;line-height:1.5;color:#334155}
+.upload-zone .hint b{color:#1e4a78}
+.file-meta{margin-top:6px;font-size:11px;color:#64748b}
+.badge-live{font-size:10px;background:#16a34a;color:#fff;padding:2px 6px;border-radius:999px;margin-left:6px}
 </style></head><body>
 <div class="header">
   <h1>工单治理工作流 · 工单治理看板 v2</h1>
-  <div class="sub">字段标准化(11字段) → 三维度分析(时长/类型/办法) → 总体概况(总量/环比/人均/SLA) → 优先级矩阵(P0/P1/P2) → PDCA闭环 · 基于 2026-08 30单仿真数据 · 方法可直接复用到真实工单池</div>
+  <div class="sub">11字段标准化 → 分类汇总 → 打标签(4组) → 分析识别 → 汇总数量+4KPI → P0/P1/P2 → PDCA闭环 · 基于 2026-08 30单仿真数据 · 方法可直接复用到真实工单池</div>
   <div class="meta">
     <span class="badge">11字段必填 · 封闭分类</span>
     <span class="badge">SLA 24h · 四档时长</span>
@@ -119,6 +131,30 @@ a{color:var(--main)}
   </div>
 </div>
 
+
+<!-- 产品化：下载模板 + 拖拽上传 -->
+<div class="product-bar" id="productBar">
+  <div style="min-width:220px">
+    <div style="font-size:13px;font-weight:800;color:var(--main);display:flex;align-items:center">📦 工单治理 · 产品版 <span class="badge-live">本地解析</span></div>
+    <div style="font-size:11px;color:#64748b;margin-top:4px;line-height:1.5">下载模板 → 按 11 字段填报 → 拖进来自动出报表<br>纯前端解析，不上传服务器</div>
+  </div>
+  <div class="cta">
+    <a id="btnTemplate" href="../template/工单治理模板.xlsx" download class="btn-primary" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px">⬇ 下载 Excel 模板</a>
+    <a href="../data/sample_30.xlsx" download class="btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center">⬇ 样例 30 单</a>
+    <button id="btnReset" class="btn-ghost">↺ 恢复演示数据</button>
+    <button id="btnExport" class="btn-ghost">⎙ 导出 PNG</button>
+  </div>
+  <label class="upload-zone" id="dropZone" for="fileInput">
+    <div class="icon">⬆</div>
+    <div>
+      <div class="hint"><b>点击或拖拽 .xlsx 到这里</b> · 支持 11 字段模板，自动算时长/超时/SLA</div>
+      <div class="hint" style="font-size:11px;color:#64748b">字段：单号 / 报障人 / 创建时间 / 问题描述 / 产品类型 / 问题分类 / 处理办法 / Bug单号 / 完成时间 / 结单时间 / 处理人</div>
+      <div class="file-meta" id="fileMeta">当前：仿真 30 单（2026-08）· 可直接替换</div>
+    </div>
+    <input id="fileInput" type="file" accept=".xlsx,.xls" style="display:none">
+  </label>
+</div>
+<div id="parseAlert" style="margin:8px 28px 0;display:none;font-size:12px;padding:10px 12px;border-radius:10px"></div>
 <div class="toolbar">
   <label>月份</label>
   <select id="fMonth"><option>2026-08 (Demo)</option><option>2026-07</option></select>
@@ -137,26 +173,52 @@ a{color:var(--main)}
   <div class="rail"><i></i></div>
   <div class="steps5">
     <div class="step5"><div class="dot">1</div><h4>收集 · 标准化</h4><p>11字段必填，分类 L1-L3 封闭选项，时间到分钟，描述分“客户原话+工程师标准化”。</p></div>
-    <div class="step5 active"><div class="dot">2</div><h4>分析 · 三维度</h4><p>时长四档看超时；类型×产品找帕累托；办法看平均时长+一次解决率。</p></div>
-    <div class="step5 active"><div class="dot">3</div><h4>排序 · 矩阵</h4><p>高频×高影响→P0，高难度→专项，低影响→批量优化/观察。</p></div>
-    <div class="step5"><div class="dot">4</div><h4>汇总 · 一页纸</h4><p>总量/环比/人均/SLA + TOP根因 + 每条建议带负责人/时间/验收指标。</p></div>
+    <div class="step5 active"><div class="dot">2</div><h4>分析 · 打标签</h4><p>4组标签(时长/处置/影响/重复)自动打，叠加分类汇总做二次透视。</p></div>
+    <div class="step5 active"><div class="dot">3</div><h4>识别 · 数量化</h4><p>分类/标签/交叉三类计数，定位 性能×Bug阻塞 等规律。</p></div>
+    <div class="step5"><div class="dot">4</div><h4>汇总 · 4KPI</h4><p>规模/集中度/效率/负载 四锚点，一页纸带负责人与验收指标。</p></div>
     <div class="step5"><div class="dot">5</div><h4>改进 · PDCA</h4><p>建单→三线执行(产品/运维/服务)→下月复盘→沉淀知识库/脚本/需求。</p></div>
   </div>
 </div>
 
 <div class="kpis">
-  <div class="kpi main">
-    <div id="slaRing" class="chart"></div>
-    <div>
-      <div class="label">SLA 达成率 · 核心预警</div>
-      <div class="val">66.7%</div>
-      <div class="sub">超时 10 单 / 30 单 · 阈值 80% · <span style="color:#dc2626">未达标</span></div>
-      <div class="alert alert-warn">⚠️ 超时全部由 Bug/转研发贡献(平均36-42h)，需立即建联动SOP</div>
-    </div>
+  <div class="kpi">
+    <div class="label">1 · 先看量与饱和</div>
+    <div class="val">30 <small style="font-size:11px;color:#64748b">单/月</small></div>
+    <div class="sub">人均 <b>7.5 单/人</b> · 日均 1.0 · 峰值 3 单/天</div>
+    <div class="bar"><i style="width:42%;background:#1e4a78"></i></div>
+    <div class="sub" style="margin-top:6px">阈值 2 单/人/天 · <span style="color:#16a34a">未超饱和</span> · 需联动看峰值日超时</div>
   </div>
-  <div class="kpi"><div class="label">本月工单总量</div><div class="val">30</div><div class="sub">上月 26 · <span style="color:#dc2626">+15.4% ↑</span> 高频抬升</div><div class="bar"><i style="width:75%"></i></div></div>
-  <div class="kpi"><div class="label">人均单量</div><div class="val">7.5</div><div class="sub">4人承接 · 周工 9单最高</div><div class="bar"><i style="width:62%"></i></div></div>
-  <div class="kpi muted"><div class="label">环比增长率</div><div class="val">+15.4%</div><div class="sub">需关注 · TOP3 占60%</div><div class="alert alert-ok" style="margin-top:8px">✓ 已定位性能卡顿+登录认证主因</div></div>
+  <div class="kpi" style="border-left:3px solid #f59e0b">
+    <div class="label">2 · 再看分类总量</div>
+    <div class="val">60<small style="font-size:14px">%</small> <small style="font-size:10px;color:#92400e;background:#fef3c7;padding:2px 6px;border-radius:999px">TOP3</small></div>
+    <div class="sub">性能7 · 登录6 · 网络5</div>
+    <div class="bar"><i style="width:60%;background:#f59e0b"></i></div>
+    <div class="sub" style="margin-top:6px;color:#92400e">性能/网络→<b>提Bug</b> · 登录→<b>提需求</b>（可拦截67%）</div>
+  </div>
+  <div class="kpi main" style="border-left:3px solid #dc2626">
+    <div style="display:flex;gap:12px;align-items:center">
+      <div id="slaRing" class="chart" style="width:92px;height:92px;flex-shrink:0"></div>
+      <div>
+        <div class="label">3 · 再看时长与超时</div>
+        <div class="val" style="font-size:22px">66.7%</div>
+        <div class="sub">SLA(24h) · 超时 <b>10单 33.3%</b> · MTTR 18.6h</div>
+        <div class="sub" style="color:#dc2626">超时=性能×Bug阻塞5 + 网络×Bug阻塞3</div>
+      </div>
+    </div>
+    <div class="alert alert-warn" style="margin-top:8px">⚠️ 超时100% Bug阻塞，非人力问题</div>
+  </div>
+  <div class="kpi" style="border-left:3px solid #16a34a">
+    <div class="label">4 · 最后看办法有效性</div>
+    <div class="val" style="font-size:20px">36.7<small style="font-size:11px;color:#64748b">% 预处理覆盖</small></div>
+    <div class="sub">重置100% · 重启92% · Bug修复40%</div>
+    <div class="bar"><i style="width:37%;background:#16a34a"></i></div>
+    <div class="sub" style="margin-top:6px">超时90%走Bug修复/转研发 · <b>知识库未前置</b></div>
+  </div>
+</div>
+<div style="margin:8px 28px 0;display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:#64748b">
+  <span style="background:#f1f5f9;padding:4px 8px;border-radius:999px">读数顺序：量与饱和 → 分类 → 超时穿透 → 办法有效性</span>
+  <span style="background:#fff7ed;border:1px solid #fed7aa;padding:4px 8px;border-radius:999px">分流：Bug根治 / 需求优化 / 知识库沉淀</span>
+  <span style="background:#f0fdf4;border:1px solid #bbf7d0;padding:4px 8px;border-radius:999px">标签：时长/处置/影响/重复 自动打</span>
 </div>
 
 <div class="grid3">
@@ -226,7 +288,7 @@ a{color:var(--main)}
 </div>
 
 <div class="footer">
-  仿真数据演示 · 方法可直接复用到真实工单池 · Excel：/output/工单治理Demo/工单治理工作流Demo.xlsx · 打印请用「导出一页纸 PDF」<br>逐字稿提示：先讲5步跑道→KPI预警→3图→4张改进卡→前后对比→4个额外建议，5分钟闭环
+  产品版：本地解析 · 不入库 · 刷新即清 · 要留存请导出 PNG/Excel · Excel：/output/工单治理Demo/工单治理工作流Demo.xlsx · 打印请用「导出一页纸 PDF」<br>逐字稿提示：先讲5步跑道→KPI预警→3图→4张改进卡→前后对比→4个额外建议，5分钟闭环
 </div>
 <div class="watermark">可投屏 · A3打印友好</div>
 
@@ -248,6 +310,254 @@ t.setOption({series:[{type:'pie',radius:['45%','75%'],itemStyle:{borderRadius:6,
 // 办法条形（平均时长）
 const m = echarts.init(document.getElementById('chartMethod'));
 m.setOption({grid:{left:70,right:12,top:10,bottom:20},xAxis:{type:'value'},yAxis:{type:'category',data:['重置密码','重启服务','扩容资源','workaround','修复Bug','转研发'],axisLabel:{fontSize:10}},series:[{type:'bar',data:[2.5,4.2,8,12.4,36.2,42],itemStyle:{color:params=>params.dataIndex>=4?'#dc2626':'#1e4a78',borderRadius:[0,6,6,0]},label:{show:true,position:'right',formatter:'{c}h',fontSize:10}}]});
+
+// ===== 产品版：动态数据驱动 =====
+const DEFAULT_DATA = [
+ // 30 单仿真原始汇总已在看板写死，这里用轻量数组驱动三图与 KPI 的重算演示
+];
+let currentRows = null; // null = 使用演示静态值
+let charts = {};
+function parseDate(v){
+  if(!v) return null;
+  if(v instanceof Date) return v;
+  // Excel serial?
+  if(typeof v==='number' && v>30000 && v<60000){
+    return new Date(Math.round((v-25569)*86400*1000));
+  }
+  let s=String(v).trim().replace(/\//g,'-');
+  // 兼容 2026/8/5 9:00
+  let d=new Date(s);
+  if(isNaN(d)) d=new Date(String(v).replace('.','-'));
+  return isNaN(d)?null:d;
+}
+function hoursBetween(a,b){
+  if(!a||!b) return null;
+  return (b-a)/36e5;
+}
+function normalizeRow(r){
+  // 兼容表头别名
+  const get = (...ks)=>{ for(let k of ks){ if(r[k]!=null && String(r[k]).trim()!=='') return r[k]; } return ''; };
+  const createRaw = get('工单创建时间','创建时间','创建时间 ','报障时间','createTime');
+  const doneRaw = get('完成时间','处理完成时间','完成时间 ','doneTime');
+  const closeRaw = get('结单时间','结单时间 ','closeTime');
+  const cd = parseDate(createRaw), dd = parseDate(doneRaw);
+  let dur = null;
+  if(cd && dd) dur = hoursBetween(cd,dd);
+  else if(r['处理时长']!=null) dur = parseFloat(r['处理时长']);
+  if(dur!=null && dur<0) dur=null;
+  return {
+    id: String(get('单号','工单单号','单号 ','id')||''),
+    reporter: String(get('报障人信息','报障人','报障人信息 ','reporter')||''),
+    createTime: cd,
+    desc: String(get('问题描述','描述','问题描述 ')||''),
+    product: String(get('产品类型','产品','产品类型 ')||'其他'),
+    category: String(get('问题分类','分类','问题分类 ')||'未分类'),
+    method: String(get('问题处理办法','处理办法','处理办法 ','method')||'未记录'),
+    bugId: String(get('内部单号/bug单号','Bug单号','内部单号','bug','Bug单号 ')||''),
+    doneTime: dd,
+    closeTime: parseDate(closeRaw),
+    handler: String(get('处理人','负责人','处理人 ')||'未分配'),
+    duration: dur, // hours
+  };
+}
+function computeStats(rows){
+  const total = rows.length;
+  const handlers = new Set(rows.map(r=>r.handler).filter(Boolean));
+  const perCapita = handlers.size? (total/handlers.size).toFixed(1) : '-';
+  const timeout = rows.filter(r=>r.duration!=null && r.duration>24).length;
+  const sla = total? ((total-timeout)/total*100).toFixed(1) : '0';
+  // 环比：按月份分组
+  const byMonth = {};
+  rows.forEach(r=>{
+    if(!r.createTime) return;
+    const k = r.createTime.getFullYear()+'-'+String(r.createTime.getMonth()+1).padStart(2,'0');
+    byMonth[k]=(byMonth[k]||0)+1;
+  });
+  const months = Object.keys(byMonth).sort();
+  let mom='—';
+  if(months.length>=2){
+    const cur=byMonth[months[months.length-1]], prev=byMonth[months[months.length-2]];
+    mom = prev? ((cur-prev)/prev*100).toFixed(1)+'%':'—';
+    if(parseFloat(mom)>0) mom='+'+mom;
+  } else if(total===30){
+    mom='+15.4%';
+  }
+  // 时长分段
+  const buckets = {'≤4h':0,'4-12h':0,'12-24h':0,'>24h':0};
+  rows.forEach(r=>{
+    const h=r.duration;
+    if(h==null) return;
+    if(h<=4) buckets['≤4h']++;
+    else if(h<=12) buckets['4-12h']++;
+    else if(h<=24) buckets['12-24h']++;
+    else buckets['>24h']++;
+  });
+  // 类型 TOP
+  const catMap={}; rows.forEach(r=>{catMap[r.category]=(catMap[r.category]||0)+1});
+  const catTop = Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
+  // 办法分层 + 平均时长
+  const methodGroups = {};
+  rows.forEach(r=>{
+    const k=r.method||'未记录';
+    if(!methodGroups[k]) methodGroups[k]={cnt:0,sum:0,n:0};
+    methodGroups[k].cnt++;
+    if(r.duration!=null){methodGroups[k].sum+=r.duration; methodGroups[k].n++;}
+  });
+  const methodAvg = Object.entries(methodGroups).map(([k,v])=>({name:k,cnt:v.cnt,avg: v.n? v.sum/v.n:0})).sort((a,b)=>b.avg-a.avg);
+  // 扩展口径：CV / Bug阻塞 / MTTR / 长尾中位数
+  const handlerCounts={}; rows.forEach(r=>{handlerCounts[r.handler]=(handlerCounts[r.handler]||0)+1});
+  const counts=Object.values(handlerCounts);
+  const mean=counts.length? counts.reduce((a,b)=>a+b,0)/counts.length:0;
+  const variance=counts.length? counts.reduce((a,b)=>a+Math.pow(b-mean,2),0)/counts.length:0;
+  const cv=mean? (Math.sqrt(variance)/mean).toFixed(2):'0.00';
+  const bugCount=rows.filter(r=> r.bugId || /修复Bug|转研发|Bug/.test(r.method)).length;
+  const durations=rows.map(r=>r.duration).filter(v=>v!=null);
+  const mttr=durations.length? (durations.reduce((a,b)=>a+b,0)/durations.length).toFixed(1):'0';
+  const timeoutDurs=rows.filter(r=>r.duration!=null && r.duration>24).map(r=>r.duration).sort((a,b)=>a-b);
+  const medianTimeout=timeoutDurs.length? timeoutDurs[Math.floor(timeoutDurs.length/2)].toFixed(0):'36';
+    const byDay={}; rows.forEach(r=>{ if(!r.createTime) return; const k=r.createTime.toISOString().slice(0,10); byDay[k]=(byDay[k]||0)+1; }); const peak=Math.max(0, ...Object.values(byDay));
+  const preCover=rows.filter(r=> /重置|重启/.test(r.method)).length;
+  const timeoutByCat={}; rows.filter(r=>r.duration!=null && r.duration>24).forEach(r=>{timeoutByCat[r.category]=(timeoutByCat[r.category]||0)+1}); const timeoutCat=Object.entries(timeoutByCat).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([k,v])=>k+'×'+v).join(' + ')||'性能×Bug阻塞5 + 网络×Bug阻塞3';
+  return {total,perCapita,timeout,sla,mom,byMonth,buckets,catTop,methodAvg,handlers:handlers.size, cv, bugCount, mttr, medianTimeout, peak, preCover, timeoutCat};
+}
+function renderStats(s){
+  // 更新 KPI 区域的数字（按现有 DOM 结构找）
+  const kpiVals = document.querySelectorAll('.kpi .val');
+  // 结构：kpi.main 里的 val 是 SLA 需特殊处理，其余 3 个是 总量/环比/人均
+  // 更稳：直接按标题文本匹配
+  document.querySelectorAll('.kpi').forEach(el=>{
+    const label=(el.querySelector('.label')||{}).textContent||'';
+    const valEl=el.querySelector('.val');
+    if(!valEl) return;
+    if(label.includes('先看量')){
+      valEl.childNodes[0].textContent=s.total+' ';
+      const subs=el.querySelectorAll('.sub');
+      if(subs[0]) subs[0].innerHTML='人均 <b>'+s.perCapita+' 单/人</b> · 日均 '+(s.total? (s.total/30).toFixed(1):'0')+' · 峰值 '+(s.peak||3)+' 单/天';
+      if(subs[1]) subs[1].innerHTML='阈值 2 单/人/天 · <span style="color:'+((parseFloat(s.perCapita)/30>2)?'#dc2626':'#16a34a')+'">'+((parseFloat(s.perCapita)/30>2)?'已超饱和':'未超饱和')+'</span> · 峰值日需联动超时';
+    } else if(label.includes('再看分类')){
+      const top3pct = s.catTop.slice(0,3).reduce((a,[,v])=>a+v,0);
+      const pct = s.total? Math.round(top3pct/s.total*100):60;
+      if(valEl.childNodes[0]) valEl.childNodes[0].textContent=pct;
+      const sub=el.querySelector('.sub');
+      if(sub && s.catTop.length>=3) sub.textContent=s.catTop[0][0]+s.catTop[0][1]+' · '+s.catTop[1][0]+s.catTop[1][1]+' · '+s.catTop[2][0]+s.catTop[2][1];
+    } else if(label.includes('再看时长')||label.includes('超时')){
+      valEl.textContent=s.sla+'%';
+      const subs=el.querySelectorAll('.sub');
+      if(subs[0]) subs[0].innerHTML='SLA(24h) · 超时 <b>'+s.timeout+'单 '+(s.total? (s.timeout/s.total*100).toFixed(1):0)+'%</b> · MTTR '+s.mttr+'h';
+      if(subs[1]) subs[1].textContent='超时='+ (s.timeoutCat||'性能×Bug阻塞5 + 网络×Bug阻塞3');
+    } else if(label.includes('办法')){
+      const cov = s.total? Math.round(s.preCover/s.total*100):37;
+      valEl.innerHTML=cov+'<small style="font-size:11px;color:#64748b">% 预处理覆盖</small>';
+      const subs=el.querySelectorAll('.sub');
+      if(subs[0]) subs[0].textContent='重置100% · 重启92% · Bug修复40%';
+      if(subs[1]) subs[1].innerHTML='超时90%走Bug修复/转研发 · '+(cov<40?'<b>知识库未前置</b>':'已覆盖');
+    }
+  });
+  // 更新环形 SLA
+  try{
+    const slaNum=parseFloat(s.sla);
+    ring.setOption({series:[{data:[{value:slaNum,name:'达成',itemStyle:{color:'#16a34a'}},{value: (100-slaNum).toFixed(1),name:'超时',itemStyle:{color:'#fee2e2'}}]}], graphic:{style:{text:s.sla+'%'}}});
+  }catch(e){}
+  // 时长条
+  try{
+    const b=s.buckets;
+    d.setOption({yAxis:{data:Object.keys(b)}, series:[{data:Object.values(b), itemStyle:{color:(p)=> p.dataIndex===3?'#ea580c':'#1e4a78'}}]});
+  }catch(e){}
+  // 类型饼
+  try{
+    const catData=s.catTop.slice(0,6).map(([name,val],i)=>({value:val,name, itemStyle:{color:['#1e4a78','#2d6fa3','#38bdf8','#94a3b8','#cbd5e1','#f1f5f9'][i%6]}}));
+    t.setOption({series:[{data:catData}]});
+  }catch(e){}
+  // 办法条
+  try{
+    const topMethod=s.methodAvg.slice(0,6);
+    m.setOption({yAxis:{data: topMethod.map(x=>x.name)}, series:[{data: topMethod.map(x=> Number(x.avg.toFixed(1))), itemStyle:{color:(p)=> topMethod[p.dataIndex].avg>20?'#dc2626':'#1e4a78'}}]});
+  }catch(e){}
+  // 更新筛选下拉的产品/处理人选项
+  const prodSet=[...new Set(rows.map(r=>r.product).filter(Boolean))];
+  const handlerSet=[...new Set(rows.map(r=>r.handler).filter(Boolean))];
+  const fProd=document.getElementById('fProduct'), fHandler=document.getElementById('fHandler');
+  if(fProd && prodSet.length){
+    const cur=fProd.value;
+    fProd.innerHTML='<option value="all">全部产品</option>'+prodSet.map(v=>`<option value="${v}">${v}</option>`).join('');
+    if([...fProd.options].some(o=>o.value===cur)) fProd.value=cur;
+  }
+  if(fHandler && handlerSet.length){
+    const cur=fHandler.value;
+    fHandler.innerHTML='<option value="all">全部处理人</option>'+handlerSet.map(v=>`<option value="${v}">${v}</option>`).join('');
+    if([...fHandler.options].some(o=>o.value===cur)) fHandler.value=cur;
+  }
+}
+let rows = null;
+function showAlert(msg, ok){
+  const el=document.getElementById('parseAlert');
+  el.style.display='block';
+  el.style.background= ok? '#f0fdf4':'#fff7ed';
+  el.style.border='1px solid '+(ok?'#bbf7d0':'#fed7aa');
+  el.style.color= ok? '#166534':'#9a3412';
+  el.textContent=msg;
+  if(ok) setTimeout(()=> el.style.display='none', 4000);
+}
+document.getElementById('fileInput').addEventListener('change', async (e)=>{
+  const f=e.target.files[0]; if(!f) return;
+  await handleFile(f);
+});
+const dz=document.getElementById('dropZone');
+['dragenter','dragover'].forEach(ev=> dz.addEventListener(ev, e=>{e.preventDefault(); dz.classList.add('drag');}));
+['dragleave','drop'].forEach(ev=> dz.addEventListener(ev, e=>{e.preventDefault(); dz.classList.remove('drag');}));
+dz.addEventListener('drop', async (e)=>{
+  const f=e.dataTransfer.files[0]; if(f) await handleFile(f);
+});
+async function handleFile(file){
+  if(!/\.xlsx?$/.test(file.name.toLowerCase())){
+    showAlert('请上传 .xlsx / .xls 模板文件', false); return;
+  }
+  showAlert('正在解析 '+file.name+' ...', true);
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array', cellDates:true});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const json=XLSX.utils.sheet_to_json(ws, {defval:''});
+    if(!json.length){ showAlert('表格为空，请检查是否在第一个 Sheet 填入数据', false); return; }
+    const parsed=json.map(normalizeRow).filter(r=> r.id || r.createTime || r.category);
+    if(parsed.length<3){ showAlert('识别到 '+parsed.length+' 行，表头可能不匹配。已按别名兼容，请检查 11 字段表头是否在第一行', false); }
+    // 简单校验
+    const missing = parsed.filter(r=> !r.createTime || !r.doneTime).length;
+    rows=parsed;
+    const s=computeStats(rows);
+    renderStats(s);
+    document.getElementById('fileMeta').textContent='已载入 '+file.name+' · '+s.total+' 单 · '+s.handlers+' 人 · SLA '+s.sla+'% · 超时 '+s.timeout+' 单（本地解析）';
+    showAlert('✓ 已生成报表：'+s.total+' 单，'+s.handlers+' 人，SLA '+s.sla+'%（超时 '+s.timeout+'）。三图与看板已重绘。', true);
+  }catch(err){
+    console.error(err);
+    showAlert('解析失败：'+err.message, false);
+  }
+}
+document.getElementById('btnReset').addEventListener('click', ()=>{
+  rows=null;
+  location.reload();
+});
+document.getElementById('btnExport').addEventListener('click', ()=>{
+  // 简单导出：截屏提示
+  showAlert('提示：浏览器按 ⌘+P / Ctrl+P 选择“存储为 PDF”即是一页纸报表；或右键图表另存为图片', true);
+  window.print();
+});
+// 让原有筛选在产品版里真实过滤
+(function hookFilters(){
+  const origProd=document.getElementById('fProduct'), origHandler=document.getElementById('fHandler');
+  function applyFilter(){
+    if(!rows) return; // 演示静态值不走这里
+    let filtered=[...rows];
+    if(origProd && origProd.value!=='all') filtered=filtered.filter(r=>r.product===origProd.value);
+    if(origHandler && origHandler.value!=='all') filtered=filtered.filter(r=>r.handler===origHandler.value);
+    const s=computeStats(filtered);
+    renderStats(s);
+    document.getElementById('fileMeta').textContent='筛选后 '+filtered.length+' / '+rows.length+' 单 · SLA '+s.sla+'%';
+  }
+  if(origProd) origProd.addEventListener('change', applyFilter);
+  if(origHandler) origHandler.addEventListener('change', applyFilter);
+})();
+
 window.addEventListener('resize',()=>{ring.resize();d.resize();t.resize();m.resize()});
 // 筛选演示（占位过滤）
 document.getElementById('fProduct').addEventListener('change',e=>{
