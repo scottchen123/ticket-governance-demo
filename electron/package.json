@@ -1,0 +1,41 @@
+{
+  "name": "ticket-governance-demo",
+  "version": "0.1.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack:win": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "build": {
+    "appId": "com.scottchen.ticketgovernance",
+    "productName": "ticket-governance-demo",
+    "extraResources": [
+      {
+        "from": "../dashboard/index.html",
+        "to": "dashboard/index.html"
+      },
+      {
+        "from": "../data/sample_30.xlsx",
+        "to": "data/sample_30.xlsx"
+      },
+      {
+        "from": "../template/工单治理模板.xlsx",
+        "to": "template/工单治理模板.xlsx"
+      }
+    ],
+    "files": [
+      "main.js"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

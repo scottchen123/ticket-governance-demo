@@ -23,8 +23,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - name: Prepare Pages site
+        run: |
+          mkdir -p _site
+          cp -R dashboard data template _site/
+          printf '%s\n' '<!doctype html><meta http-equiv="refresh" content="0; url=dashboard/"><title>Ticket Governance Workflow</title>' > _site/index.html
+          touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dashboard
+          path: ./_site
       - id: deployment
         uses: actions/deploy-pages@v4

@@ -1,2 +1,4 @@
 .DS_Store
 *.tmp
+electron/node_modules/
+electron/dist/
