@@ -2,7 +2,7 @@
 
 > **11字段标准化 → 三维度分析（时长/类型/办法）→ 4项KPI → P0/P1/P2优先级矩阵 → PDCA闭环**。基于 2026-08 仿真 30 单（SLA 24h，人均 7.5 单，超时率 33.3%），方法与模板可直接复用到真实工单池。
 
-[在线看板 Demo](https://scottchen123.github.io/ticket-governance-demo/dashboard/) · [Hugo 博文](hugo/index.md) · [Excel 模板](template/工单治理模板.xlsx) · [下载 Windows exe](https://github.com/scottchen123/ticket-governance-demo/releases)
+[在线看板 Demo](https://scottchen123.github.io/ticket-governance-demo/dashboard/) · [Excel 模板](template/工单治理模板.xlsx) · [下载 Windows exe](https://github.com/scottchen123/ticket-governance-demo/releases)
 
 ---
 
@@ -54,9 +54,6 @@ ticket-governance-demo/
 ├── dashboard/index.html      # 可交互看板（ECharts 5.4.3）
 ├── data/sample_30.xlsx       # 30单仿真样例
 ├── template/工单治理模板.xlsx # 空模板（下拉+公式）
-├── hugo/index.md             # Hugo PaperMod 博文（3500字，8章）
-├── docs/workflow.md          # 工作流说明（同 hugo/index.md）
-├── images/                   # 封面与截图占位
 ├── electron/                 # Electron 桌面版与 Windows 打包配置
 ├── README.md
 ├── README_EN.md
@@ -70,10 +67,6 @@ ticket-governance-demo/
 - **三维度**：时长分段（≤4h/4-12h/12-24h/>24h）揪长尾；类型 TOP-N 定点爆破（性能7+登录6+网络5 占60%）；办法分层沉淀 SOP。
 - **优先级**：P0 根治（性能卡顿/Bug链路）、P1 专项（登录认证）、P2 优化（配置错误）。
 - **闭环**：PDCA，周会以看板为材料，下月同口径复测验收。
-
-## Hugo 部署
-
-将 `hugo/index.md` 复制到你 Hugo 站点的 `content/post/ticket-governance-workflow/index.md`，将 `dashboard/index.html` 复制到 `static/demo/ticket-governance/index.html`，封面放 `static/images/ticket-governance/cover.jpg`，文中已含 `iframe` 嵌入代码。
 
 ## GitHub Pages
 
